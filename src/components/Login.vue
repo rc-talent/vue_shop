@@ -44,6 +44,7 @@ export default {
   },
   methods: {
     resetLoginForm () {
+      // 重置表单数据
       this.$refs.loginFormRef.resetFields()
     },
     submitLoginForm () {
@@ -52,7 +53,6 @@ export default {
         let { data } = await this.$http.post('login', this.form)
         if (data.meta.status !== 200) return this.$message.error('登录失败')
         this.$message.success('登录成功')
-        console.log(data)
         window.sessionStorage.setItem('token', data.data.token)
         this.$router.push('/home')
       })
