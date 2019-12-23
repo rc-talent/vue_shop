@@ -1,11 +1,7 @@
 <template>
   <div>
     <!-- 面包屑导航 -->
-    <el-breadcrumb separator-class="el-icon-arrow-right">
-      <el-breadcrumb-item :to="{ path: '/' }">首页</el-breadcrumb-item>
-      <el-breadcrumb-item>用户管理</el-breadcrumb-item>
-      <el-breadcrumb-item>用户列表</el-breadcrumb-item>
-    </el-breadcrumb>
+    <crumbs-navigation text1="用户管理" text2="用户列表"></crumbs-navigation>
     <!-- 卡片视图区域 -->
     <el-card>
       <!-- 搜索与添加 -->
@@ -43,7 +39,7 @@
             </el-tooltip>
             <!-- 分配角色按钮 -->
             <el-tooltip effect="dark" content="分配角色" placement="top" :enterable="false">
-              <el-button size="mini" type="danger" icon="el-icon-setting"></el-button>
+              <el-button size="mini" type="danger" icon="el-icon-setting" @click="setRole(scope.row)"></el-button>
             </el-tooltip>
           </template>
         </el-table-column>
@@ -61,7 +57,7 @@
       </el-pagination>
     </el-card>
     <!-- 添加用户对话框 -->
-    <el-dialog title="提示" :visible.sync="addDialogVisible" width="50%">
+    <el-dialog title="添加用户" :visible.sync="addDialogVisible" width="50%">
       <!-- 对话框内容区域 -->
       <el-form :model="addForm" label-width="70px" :rules="formRules" ref="addFormRef">
         <el-form-item label="用户名" prop="username">
@@ -83,7 +79,7 @@
       </span>
     </el-dialog>
     <!-- 修改用户对话框 -->
-    <el-dialog title="提示" :visible.sync="amendDialogVisible" width="50%">
+    <el-dialog title="修改用户" :visible.sync="amendDialogVisible" width="50%">
       <!-- 对话框内容区域 -->
       <el-form :model="amendForm" label-width="70px" :rules="formRules" ref="amendFormRef">
         <el-form-item label="用户名">
@@ -99,6 +95,24 @@
       <span slot="footer">
         <el-button @click="cancelAmendForm">取 消</el-button>
         <el-button type="primary" @click="notarizeAmendForm(amendForm.id)">确 定</el-button>
+      </span>
+    </el-dialog>
+    <!-- 分配角色对话框 -->
+    <el-dialog title="分配角色" :visible.sync="setRoleDialogVisible" width="50%">
+      <!-- 对话框内容区域 -->
+      <div>
+        <p>当前的用户：{{ userInfo.username }}</p>
+        <p>当前的角色：{{ userInfo.role_name }}</p>
+        <p>
+          分配新角色：
+          <el-select v-model="roleValue" placeholder="请选择">
+            <el-option v-for="item in rolesList" :key="item.id" :label="item.roleName" :value="item.id"> </el-option>
+          </el-select>
+        </p>
+      </div>
+      <span slot="footer">
+        <el-button @click="setRoleDialogVisible = false">取 消</el-button>
+        <el-button type="primary" @click="saveRoleinfo(userInfo.id)">确 定</el-button>
       </span>
     </el-dialog>
   </div>
@@ -132,6 +146,7 @@ export default {
       total: 0,
       addDialogVisible: false,
       amendDialogVisible: false,
+      setRoleDialogVisible: false,
       addForm: {
         username: '',
         password: '',
@@ -156,7 +171,12 @@ export default {
           { validator: checkMobile, trigger: 'blur' }
         ]
       },
-      amendForm: {}
+      amendForm: {},
+      // 被分配角色的用户信息
+      userInfo: {},
+      // 所有的角色信息
+      rolesList: [],
+      roleValue: ''
     }
   },
   created() {
@@ -167,7 +187,7 @@ export default {
       let { data: res } = await this.$http.get('users', {
         params: this.queryInfo
       })
-      if (res.meta.status !== 200) return this.$message.error('获取用户列表失败')
+      if (res.meta.status !== 200) return this.$message.error(res.meta.msg)
       this.userList = res.data.users
       this.total = res.data.total
     },
@@ -181,15 +201,15 @@ export default {
     },
     async stateChange(id, type) {
       let { data: res } = await this.$http.put('users/' + id + '/state/' + type)
-      if (res.meta.status !== 200) return this.$message.error('修改状态失败')
-      this.$message.success('修改状态成功')
+      if (res.meta.status !== 200) return this.$message.error(res.meta.msg)
+      this.$message.success(res.meta.msg)
     },
     notarizeAddForm() {
       this.$refs.addFormRef.validate(async valid => {
         // valid是一个boolean值 是验证表单数据是否都满足要求
         if (!valid) return false
         let { data: res } = await this.$http.post('users', this.addForm)
-        if (res.meta.status !== 201) return this.$message.error('创建用户失败')
+        if (res.meta.status !== 201) return this.$message.error(res.meta.msg)
         this.addDialogVisible = false
         this.getUserList()
       })
@@ -201,7 +221,7 @@ export default {
     async amendUsers(id) {
       let { data: res } = await this.$http.get('users/' + id)
       console.log(res)
-      if (res.meta.status !== 200) return this.$message.error('获取用户失败')
+      if (res.meta.status !== 200) return this.$message.error(res.meta.msg)
       this.amendDialogVisible = true
       this.amendForm = res.data
     },
@@ -215,7 +235,7 @@ export default {
         if (!valid) return false
         let { data: res } = await this.$http.put('users/' + id, { email: this.amendForm.email, mobile: this.amendForm.mobile })
         console.log(res)
-        if (res.meta.status !== 200) return this.$message.error('更新用户失败')
+        if (res.meta.status !== 200) return this.$message.error(res.meta.msg)
         this.amendDialogVisible = false
         this.getUserList()
       })
@@ -229,10 +249,30 @@ export default {
       if (confirmResult === 'cancel') return this.$message.info('已取消删除')
       if (confirmResult === 'confirm') {
         let { data: res } = await this.$http.delete('users/' + id)
-        if (res.meta.status !== 200) return this.$message.error('删除用户失败')
-        this.$message.success('删除用户成功')
+        if (res.meta.status !== 200) return this.$message.error(res.meta.msg)
+        this.$message.success(res.meta.msg)
         this.getUserList()
       }
+    },
+    async setRole(userInfo) {
+      this.setRoleDialogVisible = true
+      this.userInfo = userInfo
+      console.log(userInfo)
+      let { data: res } = await this.$http.get('roles')
+      if (res.meta.status !== 200) return this.$message.error(res.meta.msg)
+      this.rolesList = res.data
+      console.log(res)
+    },
+    async saveRoleinfo(id) {
+      let { data: res } = await this.$http.put('users/' + id + '/role', {
+        rid: this.roleValue
+      })
+      this.setRoleDialogVisible = false
+      if (res.meta.status !== 200) return this.$message.error(res.meta.msg)
+      this.$message.success(res.meta.msg)
+      this.getUserList()
+      console.log(res)
+      console.log(id, this.roleValue)
     }
   }
 }

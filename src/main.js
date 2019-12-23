@@ -2,6 +2,7 @@ import Vue from 'vue'
 import App from './App.vue'
 import router from './router'
 import './plugins/element.js'
+import GlobalCrumbs from './components/GlobalCrumbs.vue'
 
 // 全局样式导入
 import './assets/css/global.css'
@@ -18,6 +19,8 @@ axios.interceptors.request.use(config => {
 // 将axios挂载到vue全局
 Vue.prototype.$http = axios
 Vue.config.productionTip = false
+// 全局挂载面包屑导航
+Vue.component('crumbs-navigation', GlobalCrumbs)
 
 new Vue({
   router,

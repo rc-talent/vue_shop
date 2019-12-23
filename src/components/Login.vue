@@ -51,8 +51,8 @@ export default {
       this.$refs.loginFormRef.validate(async (valid) => {
         if (!valid) return false
         let { data } = await this.$http.post('login', this.form)
-        if (data.meta.status !== 200) return this.$message.error('登录失败')
-        this.$message.success('登录成功')
+        if (data.meta.status !== 200) return this.$message.error(data.meta.msg)
+        this.$message.success(data.meta.msg)
         window.sessionStorage.setItem('token', data.data.token)
         this.$router.push('/home')
       })
